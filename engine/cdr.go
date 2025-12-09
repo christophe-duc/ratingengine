@@ -23,6 +23,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"strconv"
