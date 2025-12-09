@@ -325,6 +325,11 @@ func (alS *AttributeService) V1ProcessEvent(ctx *context.Context, args *utils.CG
 	alteredFields := make(utils.StringSet)
 	dynDP := newDynamicDP(alS.cgrcfg.AttributeSCfg().ResourceSConns,
 		alS.cgrcfg.AttributeSCfg().StatSConns, alS.cgrcfg.AttributeSCfg().ApierSConns, nil, nil, args.Tenant, eNV)
+	// DEBUG: Log event before attribute processing
+	if torVal, hasTor := args.Event[utils.ToR]; hasTor {
+		utils.Logger.Info(fmt.Sprintf("=== ATTRIBUTES BEFORE === ToR: '%v', Event: %+v", torVal, args.Event))
+	}
+
 	for i := 0; i < processRuns; i++ {
 		(eNV[utils.MetaVars].(utils.MapStorage))[utils.MetaProcessRuns] = i + 1
 		var evRply *AttrSProcessEventReply
@@ -343,6 +348,13 @@ func (alS *AttributeService) V1ProcessEvent(ctx *context.Context, args *utils.CG
 		matchedIDs = append(matchedIDs, lastID)
 		processedPrf.Add(lastID)
 		processedPrfNo[lastID] = processedPrfNo[lastID] + 1
+
+		// DEBUG: Log which profile matched and what fields were altered
+		utils.Logger.Info(fmt.Sprintf("=== ATTRIBUTES MATCHED === Profile: '%s', AlteredFields: %v", lastID, evRply.AlteredFields))
+		if torVal, hasTor := args.Event[utils.ToR]; hasTor {
+			utils.Logger.Info(fmt.Sprintf("=== ATTRIBUTES AFTER PROFILE '%s' === ToR is now: '%v'", lastID, torVal))
+		}
+
 		for _, fldName := range evRply.AlteredFields {
 			alteredFields.Add(fldName)
 		}
