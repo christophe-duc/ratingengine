@@ -570,10 +570,17 @@ func (b *Balance) debit(cd *CallDescriptor, ub *Account, moneyBalances Balances,
 	// no rating subject
 	//log.Print("B: ", utils.ToJSON(b))
 	//log.Printf("}}}}}}} %+v", cd.testCallcost)
+	utils.Logger.Info(fmt.Sprintf("=== BALANCE GetCost === Balance: %s, calling GetCost for rating", b.ID))
 	cc, err = b.GetCost(cd, true)
 	if err != nil {
+		utils.Logger.Info(fmt.Sprintf("=== BALANCE GetCost ERROR === Balance: %s, Error: %v", b.ID, err))
 		return nil, err
 	}
+	if cc == nil {
+		utils.Logger.Info(fmt.Sprintf("=== BALANCE GetCost RETURNED NIL === Balance: %s, no CallCost returned", b.ID))
+		return nil, nil
+	}
+	utils.Logger.Info(fmt.Sprintf("=== BALANCE GetCost SUCCESS === Balance: %s, got CallCost with %d timespans", b.ID, len(cc.Timespans)))
 
 	var debitedConnectFeeBalance Balance
 	var connectFeeDebited bool
