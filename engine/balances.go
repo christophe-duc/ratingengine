@@ -494,6 +494,8 @@ func (b *Balance) debit(cd *CallDescriptor, ub *Account, moneyBalances Balances,
 	if duration, err_ := utils.ParseZeroRatingSubject(tor, b.RatingSubject,
 		config.CgrConfig().RalsCfg().BalanceRatingSubject, isUnitBal); err_ == nil {
 		// we have *zero based units
+		utils.Logger.Info(fmt.Sprintf("=== ZERO RATING PATH === Balance: %s, Duration: %v, ToR: %s", b.ID, duration, tor))
+
 		cc = cd.CreateCallCost()
 		ts := &TimeSpan{
 			TimeStart: cd.TimeStart,
@@ -527,6 +529,9 @@ func (b *Balance) debit(cd *CallDescriptor, ub *Account, moneyBalances Balances,
 			RatingPlanId:   utils.MetaNone,
 		})
 		ts.createIncrementsSlice()
+
+		utils.Logger.Info(fmt.Sprintf("=== ZERO RATING INCREMENTS === Balance: %s, NumIncrements: %d", b.ID, len(ts.Increments)))
+
 		//log.Printf("CC: %+v", ts)
 		for incIndex, inc := range ts.Increments {
 			//log.Printf("INCREMENET: %+v", inc)
@@ -534,6 +539,10 @@ func (b *Balance) debit(cd *CallDescriptor, ub *Account, moneyBalances Balances,
 			if bFactor != 1 {
 				amount = utils.Round(amount*bFactor, globalRoundingDecimals, utils.MetaRoundingUp)
 			}
+
+			utils.Logger.Info(fmt.Sprintf("=== ZERO RATING INC[%d] === Balance: %s, IncDuration: %v, Amount: %.4f, BalanceValue: %.4f",
+				incIndex, b.ID, inc.Duration, amount, b.GetValue()))
+
 			if b.GetValue() >= amount {
 				b.SubtractValue(amount)
 				inc.BalanceInfo.Unit = &UnitInfo{
@@ -552,11 +561,16 @@ func (b *Balance) debit(cd *CallDescriptor, ub *Account, moneyBalances Balances,
 				if count {
 					ub.countUnits(amount, tor, cc, b, fltrS)
 				}
+				utils.Logger.Info(fmt.Sprintf("=== ZERO RATING INC[%d] DEBITED === Balance: %s, Consumed: %.4f, Remaining: %.4f",
+					incIndex, b.ID, amount, b.GetValue()))
 				continue
 			}
 			// delete the rest of the unpiad increments/timespans
+			utils.Logger.Info(fmt.Sprintf("=== ZERO RATING INSUFFICIENT === Balance: %s, incIndex: %d, needed: %.4f, have: %.4f",
+				b.ID, incIndex, amount, b.GetValue()))
 			if incIndex == 0 {
 				// cut the entire current timespan
+				utils.Logger.Info(fmt.Sprintf("=== ZERO RATING RETURNING NIL === Balance: %s, first increment can't be covered", b.ID))
 				return nil, nil
 			}
 			ts.SplitByIncrement(incIndex)
