@@ -454,9 +454,13 @@ func (acc *Account) debitCreditBalance(cd *CallDescriptor, count bool, dryRun bo
 			// try every balance multiple times in case one becomes active or ratig changes
 			unitBalanceChecker = false
 			for _, balance := range usefulUnitBalances {
+				utils.Logger.Info(fmt.Sprintf("=== ATTEMPTING DEBIT === Balance: %s, Value: %.4f, RatingSubject: '%s'",
+					balance.ID, balance.GetValue(), balance.RatingSubject))
+
 				partCC, debitErr := balance.debit(cd, balance.account,
 					usefulMoneyBalances, count, dryRun, len(cc.Timespans) == 0, true, fltrS)
 				if debitErr != nil {
+					utils.Logger.Info(fmt.Sprintf("=== DEBIT ERROR === Balance: %s, Error: %v", balance.ID, debitErr))
 					return nil, debitErr
 				}
 				if balance.RatingSubject != "" &&
@@ -464,6 +468,8 @@ func (acc *Account) debitCreditBalance(cd *CallDescriptor, count bool, dryRun bo
 					hadBalanceSubj = true
 				}
 				if partCC != nil {
+					utils.Logger.Info(fmt.Sprintf("=== DEBIT SUCCESS === Balance: %s debited, Timespans: %d, RemainingDuration: %v",
+						balance.ID, len(partCC.Timespans), cd.GetDuration()))
 					cc.Timespans = append(cc.Timespans, partCC.Timespans...)
 					cc.negativeConnectFee = partCC.negativeConnectFee
 					cd.TimeStart = cc.GetEndTime()
@@ -478,6 +484,9 @@ func (acc *Account) debitCreditBalance(cd *CallDescriptor, count bool, dryRun bo
 						// only return if we are in dry run (max call duration)
 						return
 					}
+				} else {
+					utils.Logger.Info(fmt.Sprintf("=== DEBIT RETURNED NIL === Balance: %s returned nil partCC (balance might not cover this call)",
+						balance.ID))
 				}
 				// check for blocker
 				if balance.Blocker {
