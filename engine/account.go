@@ -294,26 +294,52 @@ func (acc *Account) debitBalanceAction(a *Action, reset, resetIfNegative bool, f
 
 func (acc *Account) getBalancesForPrefix(prefix, category, tor,
 	sharedGroup string, aTime time.Time) Balances {
+	// DEBUG: Show all balance types in account
+	balanceMapKeys := make([]string, 0, len(acc.BalanceMap))
+	for k := range acc.BalanceMap {
+		balanceMapKeys = append(balanceMapKeys, k)
+	}
+	utils.Logger.Debug(fmt.Sprintf("Account %s BalanceMap keys: %v", acc.ID, balanceMapKeys))
+	if balList, ok := acc.BalanceMap[tor]; ok {
+		utils.Logger.Debug(fmt.Sprintf("  Balances under ToR '%s': %d balances", tor, len(balList)))
+		for i, bal := range balList {
+			utils.Logger.Debug(fmt.Sprintf("    [%d] %s: Value=%.4f, Cat=%v", i, bal.ID, bal.GetValue(), bal.Categories))
+		}
+	} else {
+		utils.Logger.Debug(fmt.Sprintf("  No balances found under ToR '%s'", tor))
+	}
+
 	var balances Balances
 	balances = append(balances, acc.BalanceMap[tor]...)
 	if tor != utils.MetaMonetary && tor != utils.MetaGeneric {
 		balances = append(balances, acc.BalanceMap[utils.MetaGeneric]...)
 	}
 
+	// DEBUG: Log balance filtering process
+	utils.Logger.Debug(fmt.Sprintf("getBalancesForPrefix: ToR=%s, Category=%s, Prefix=%s, Total balances before filter: %d",
+		tor, category, prefix, len(balances)))
+
 	var usefulBalances Balances
 	for _, b := range balances {
 		if b.Disabled {
+			utils.Logger.Debug(fmt.Sprintf("  Balance %s SKIPPED: Disabled", b.ID))
 			continue
 		}
 		if b.IsExpiredAt(aTime) || (len(b.SharedGroups) == 0 && b.GetValue() <= 0 && !b.Blocker) {
+			utils.Logger.Debug(fmt.Sprintf("  Balance %s SKIPPED: Expired=%v, Value=%.4f, Blocker=%v",
+				b.ID, b.IsExpiredAt(aTime), b.GetValue(), b.Blocker))
 			continue
 		}
 		if sharedGroup != "" && !b.SharedGroups[sharedGroup] {
+			utils.Logger.Debug(fmt.Sprintf("  Balance %s SKIPPED: SharedGroup mismatch", b.ID))
 			continue
 		}
 		if !b.MatchCategory(category) {
+			utils.Logger.Debug(fmt.Sprintf("  Balance %s SKIPPED: Category mismatch (balance categories=%v, requested=%s)",
+				b.ID, b.Categories, category))
 			continue
 		}
+		utils.Logger.Debug(fmt.Sprintf("  Balance %s PASSED initial filters, checking destination...", b.ID))
 		b.account = acc
 
 		if len(b.DestinationIDs) > 0 && !b.DestinationIDs[utils.MetaAny] {
@@ -360,6 +386,13 @@ func (acc *Account) getBalancesForPrefix(prefix, category, tor,
 	for _, b := range usefulBalances {
 		b.precision = 0
 	}
+
+	// DEBUG: Show final selected balances
+	utils.Logger.Debug(fmt.Sprintf("getBalancesForPrefix: Returning %d useful balances after filtering and sorting", len(usefulBalances)))
+	for i, b := range usefulBalances {
+		utils.Logger.Debug(fmt.Sprintf("  Final[%d]: ID=%s, Value=%.4f, Categories=%v", i, b.ID, b.GetValue(), b.Categories))
+	}
+
 	return usefulBalances
 }
 
@@ -389,6 +422,22 @@ func (acc *Account) getAlldBalancesForPrefix(destination, category,
 func (acc *Account) debitCreditBalance(cd *CallDescriptor, count bool, dryRun bool, goNegative bool, fltrS *FilterS) (cc *CallCost, err error) {
 	usefulUnitBalances := acc.getAlldBalancesForPrefix(cd.Destination, cd.Category, cd.ToR, cd.TimeStart)
 	usefulMoneyBalances := acc.getAlldBalancesForPrefix(cd.Destination, cd.Category, utils.MetaMonetary, cd.TimeStart)
+
+	// DEBUG: Log balance selection results
+	utils.Logger.Info("=== DEBIT BALANCE DEBUG ===")
+	utils.Logger.Info(fmt.Sprintf("Account: %s, ToR: %s, Category: %s, Destination: %s",
+		acc.ID, cd.ToR, cd.Category, cd.Destination))
+	utils.Logger.Info(fmt.Sprintf("Found %d unit balances for ToR '%s':", len(usefulUnitBalances), cd.ToR))
+	for i, b := range usefulUnitBalances {
+		utils.Logger.Info(fmt.Sprintf("  [%d] ID=%s, Value=%.4f, Categories=%v, DestIDs=%v, Disabled=%v, Expired=%v",
+			i, b.ID, b.GetValue(), b.Categories, b.DestinationIDs, b.Disabled, b.IsExpiredAt(cd.TimeStart)))
+	}
+	utils.Logger.Info(fmt.Sprintf("Found %d money balances:", len(usefulMoneyBalances)))
+	for i, b := range usefulMoneyBalances {
+		utils.Logger.Info(fmt.Sprintf("  [%d] ID=%s, Value=%.4f, Categories=%v",
+			i, b.ID, b.GetValue(), b.Categories))
+	}
+
 	// intiValues map[UUID]float64 and pass them to publish updating initial value
 	initUnitBal, initMoneyBal := balancesValues(usefulUnitBalances), balancesValues(usefulMoneyBalances)
 
