@@ -551,6 +551,10 @@ type UsageRecord struct {
 }
 
 func (uR *UsageRecord) AsCallDescriptor(timezone string, denyNegative bool) (*CallDescriptor, error) {
+	// DEBUG: Log UsageRecord ToR
+	utils.Logger.Info(fmt.Sprintf("=== AsCallDescriptor === UsageRecord.ToR: '%s', Category: '%s', Account: '%s'",
+		uR.ToR, uR.Category, uR.Account))
+
 	var err error
 	cd := &CallDescriptor{
 		CgrID:               uR.GetId(),

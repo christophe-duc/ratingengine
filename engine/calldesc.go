@@ -706,6 +706,10 @@ func (cd *CallDescriptor) GetMaxSessionDuration(fltrS *FilterS) (duration time.D
 // Interface method used to add/substract an amount of cents or bonus seconds (as returned by GetCost method)
 // from user's money balance.
 func (cd *CallDescriptor) debit(account *Account, dryRun bool, goNegative bool, fltrS *FilterS) (cc *CallCost, err error) {
+	// DEBUG: Log ToR at start of debit
+	utils.Logger.Info(fmt.Sprintf("=== DEBIT ENTRY === Account: %s, ToR: '%s', Category: '%s', Destination: '%s'",
+		cd.GetAccountKey(), cd.ToR, cd.Category, cd.Destination))
+
 	if cd.GetDuration() == 0 {
 		cc = cd.CreateCallCost()
 		// add RatingInfo
@@ -722,7 +726,9 @@ func (cd *CallDescriptor) debit(account *Account, dryRun bool, goNegative bool, 
 	}
 	if cd.ToR == "" {
 		cd.ToR = utils.MetaVoice
+		utils.Logger.Info(fmt.Sprintf("ToR was empty, defaulting to: '%s'", cd.ToR))
 	}
+	utils.Logger.Info(fmt.Sprintf("ToR before debitCreditBalance: '%s'", cd.ToR))
 	//log.Printf("Debit CD: %+v", cd)
 	cc, err = account.debitCreditBalance(cd, !dryRun, dryRun, goNegative, fltrS)
 	//log.Printf("HERE: %+v %v", cc, err)
